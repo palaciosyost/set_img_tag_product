@@ -11,35 +11,24 @@ class TagImageProduct(models.Model):
 
         last_id = 0
         total = 0
+        ProductTemplate = self.env['product.template']
 
         while True:
-            self.env.cr.execute("""
-                WITH to_upd AS (
-                    SELECT pt.id
-                    FROM product_template pt
-                    JOIN product_tag_product_template_rel rel
-                      ON rel.product_template_id = pt.id
-                    WHERE rel.product_tag_id = %s
-                      AND pt.id > %s
-                    ORDER BY pt.id
-                    LIMIT %s
-                )
-                UPDATE product_template pt
-                   SET image_1920 = %s,
-                       write_date = NOW()
-                  FROM to_upd
-                 WHERE pt.id = to_upd.id
-                 RETURNING pt.id
-            """, (self.id, last_id, batch_size, tag_img))
+            # Buscar productos relacionados al tag, por batch
+            products = ProductTemplate.search([
+                ('product_tag_ids', 'in', self.id),
+                ('id', '>', last_id)
+            ], order='id', limit=batch_size)
 
-            ids = [r[0] for r in self.env.cr.fetchall()]
-            if not ids:
+            if not products:
                 break
 
-            total += len(ids)
-            last_id = ids[-1]
+            # Actualizar imagen en lote
+            products.write({'image_1920': tag_img})
+            last_id = products[-1].id
+            total += len(products)
 
-            self.env.cr.commit()
+            # Invalida cache por seguridad
             self.env.invalidate_all()
 
         return total
