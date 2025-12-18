@@ -3,7 +3,7 @@ from odoo import models
 class TagImageProduct(models.Model):
     _inherit = 'product.tag'
 
-    def set_image_product_sql(self, batch_size=2000):
+    def set_image_product(self, batch_size=2000):
         self.ensure_one()
         tag_img = self.image
         if not tag_img:
