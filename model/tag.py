@@ -33,8 +33,8 @@ class TagImageProduct(models.Model):
             offset_id = products[-1].id
             total_updated += len(products)
 
-            # Invalida caché para mantener datos consistentes
-            self.env.invalidate_all()
+            # ❌ NO uses commit ni invalidate_all aquí
+            # Odoo maneja el ciclo de vida de las transacciones
 
         _logger.info("Imagen de la etiqueta '%s' aplicada a %d productos.", self.name, total_updated)
         return total_updated
