@@ -1,43 +1,45 @@
-from odoo import models, api
+from odoo import models
 
 class TagImageProduct(models.Model):
     _inherit = 'product.tag'
 
-    def set_image_product(self, batch_size=300, commit_each_batch=True):
+    def set_image_product_sql(self, batch_size=2000):
         self.ensure_one()
-
         tag_img = self.image
         if not tag_img:
             return 0
-
-        ProductT = self.env['product.template'].with_context(
-            prefetch_fields=False,
-            tracking_disable=True,
-            mail_notrack=True,
-        )
 
         last_id = 0
         total = 0
 
         while True:
-            batch = ProductT.search(
-                [('product_tag_ids', 'in', self.id), ('id', '>', last_id)],
-                order='id',
-                limit=batch_size
-            )
-            if not batch:
+            self.env.cr.execute("""
+                WITH to_upd AS (
+                    SELECT pt.id
+                    FROM product_template pt
+                    JOIN product_tag_product_template_rel rel
+                      ON rel.product_template_id = pt.id
+                    WHERE rel.product_tag_id = %s
+                      AND pt.id > %s
+                    ORDER BY pt.id
+                    LIMIT %s
+                )
+                UPDATE product_template pt
+                   SET image_1920 = %s,
+                       write_date = NOW()
+                  FROM to_upd
+                 WHERE pt.id = to_upd.id
+                 RETURNING pt.id
+            """, (self.id, last_id, batch_size, tag_img))
+
+            ids = [r[0] for r in self.env.cr.fetchall()]
+            if not ids:
                 break
 
-            # Savepoint para que si algo falla no mate todo
-            with self.env.cr.savepoint():
-                batch.write({'image_1920': tag_img})
+            total += len(ids)
+            last_id = ids[-1]
 
-            total += len(batch)
-            last_id = batch[-1].id
-
-            if commit_each_batch:
-                self.env.cr.commit()
-                # MUY importante en procesos largos: libera cache ORM
-                self.env.invalidate_all()
+            self.env.cr.commit()
+            self.env.invalidate_all()
 
         return total
