@@ -6,7 +6,7 @@ _logger = logging.getLogger(__name__)
 class TagImageProduct(models.Model):
     _inherit = 'product.tag'
 
-    def set_image_product(self, batch_size=2000):
+    def set_image_product(self, batch_size=500):
         """Set this tag's image to all linked product templates, in batches."""
         self.ensure_one()
 
